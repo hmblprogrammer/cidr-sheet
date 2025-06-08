@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Network Manager</title>
+  <!-- Tabulator CSS -->
+  <link href="https://unpkg.com/tabulator-tables@5.4.3/dist/css/tabulator.min.css" rel="stylesheet" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #controls { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Network Manager</h1>
+  <div id="controls">
+    <button id="add-network">Add Network</button>
+    <button id="download-json">Export JSON</button>
+  </div>
+  <div id="network-table"></div>
+
+  <!-- Tabulator JS -->
+  <script src="https://unpkg.com/tabulator-tables@5.4.3/dist/js/tabulator.min.js"></script>
+  <script>
+    // initial data array
+    const tableData = [
+      { region: "Building A", location: "Floor 1", cidr: "10.0.1.0/24", vlan: 10, status: "In use", description: "Office network", tags: "core,prod" },
+      { region: "AWS us-east-1", location: "us-east-1a", cidr: "172.31.0.0/16", vlan: 0, status: "In use", description: "AWS default VPC", tags: "aws,default" }
+    ];
+
+    // create Tabulator on DOM element with id "network-table"
+    const table = new Tabulator("#network-table", {
+      data: tableData,
+      layout: "fitColumns",
+      reactiveData: true, // enable reactive data mutations
+      addRowPos: "top",
+      height: "600px",
+      columns: [
+        {
+          title: "Region/Site",
+          field: "region",
+          editor: "input",
+          headerFilter: "input"
+        },
+        {
+          title: "Location",
+          field: "location",
+          editor: "input",
+          headerFilter: "input"
+        },
+        {
+          title: "CIDR Range",
+          field: "cidr",
+          editor: "input",
+          headerFilter: "input",
+          validator: ["required", { type: "regex", regex: /^(?:\d{1,3}\.){3}\d{1,3}\/(?:[0-9]|[12][0-9]|3[0-2])$/ }]
+        },
+        {
+          title: "VLAN ID",
+          field: "vlan",
+          editor: "number",
+          headerFilter: "number"
+        },
+        {
+          title: "Status",
+          field: "status",
+          editor: "select",
+          editorParams: {
+            values: {
+              "In use": "In use",
+              "Deprecated": "Deprecated",
+              "Legacy": "Legacy",
+              "Decommissioned": "Decommissioned",
+              "Proposed": "Proposed",
+              "Future State": "Future State"
+            }
+          },
+          headerFilter: "select",
+          headerFilterParams: {
+            values: {
+              "": "(all)",
+              "In use": "In use",
+              "Deprecated": "Deprecated",
+              "Legacy": "Legacy",
+              "Decommissioned": "Decommissioned",
+              "Proposed": "Proposed",
+              "Future State": "Future State"
+            }
+          }
+        },
+        {
+          title: "Description",
+          field: "description",
+          editor: "textarea",
+          headerFilter: "input"
+        },
+        {
+          title: "Tags",
+          field: "tags",
+          formatter: "list",
+          formatterParams: { delimiter: "," },
+          editor: "input",
+          headerFilter: "input"
+        }
+      ],
+      cellEdited: (cell) => {
+        console.log("Cell Edited:", cell.getField(), cell.getValue());
+      }
+    });
+
+    // button to add a blank row
+    document.getElementById("add-network").addEventListener("click", () => {
+      table.addRow({ region: "", location: "", cidr: "", vlan: null, status: "Proposed", description: "", tags: "" });
+    });
+
+    // button to export data as JSON
+    document.getElementById("download-json").addEventListener("click", () => {
+      const data = table.getData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "networks.json";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
