@@ -22,95 +22,104 @@
   <!-- Tabulator JS -->
   <script src="https://unpkg.com/tabulator-tables@5.4.3/dist/js/tabulator.min.js"></script>
   <script>
-    // initial data array
+    // Helper functions for CIDR calculations
+    function numToIp(num) {
+      return [(num >>> 24) & 0xFF, (num >>> 16) & 0xFF, (num >>> 8) & 0xFF, num & 0xFF].join('.');
+    }
+
+    function parseCidr(cidr) {
+      const parts = cidr.split('/');
+      const ip = parts[0];
+      const mask = parseInt(parts[1], 10);
+      const ipParts = ip.split('.').map(x => parseInt(x, 10));
+      const ipNum = (((ipParts[0] << 24) >>> 0) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3]) >>> 0;
+      const hostBits = 32 - mask;
+      const maskBits = mask === 0 ? 0 : ((~0 << hostBits) >>> 0);
+      const network = (ipNum & maskBits) >>> 0;
+      const broadcast = (network | ((1 << hostBits) - 1)) >>> 0;
+      return { first: numToIp(network), last: numToIp(broadcast) };
+    }
+
+    function formatIpRange(cidr) {
+      if (!cidr) return '';
+      try {
+        const { first, last } = parseCidr(cidr);
+        return `${first} - ${last}`;
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function countIps(cidr) {
+      if (!cidr) return '';
+      const mask = parseInt(cidr.split('/')[1], 10);
+      return Math.pow(2, 32 - mask);
+    }
+
+    // initial data array with computed columns
     const tableData = [
-      { region: "Building A", location: "Floor 1", cidr: "10.0.1.0/24", vlan: 10, status: "In use", description: "Office network", tags: "core,prod" },
-      { region: "AWS us-east-1", location: "us-east-1a", cidr: "172.31.0.0/16", vlan: 0, status: "In use", description: "AWS default VPC", tags: "aws,default" }
+      {
+        name: "Office LAN",
+        region: "Building A",
+        location: "Floor 1",
+        cidr: "10.0.1.0/24",
+        vlan: 10,
+        status: "In use",
+        description: "Office network",
+        tags: "core,prod",
+        ip_range: formatIpRange("10.0.1.0/24"),
+        num_ips: countIps("10.0.1.0/24")
+      },
+      {
+        name: "AWS Default VPC",
+        region: "AWS us-east-1",
+        location: "us-east-1a",
+        cidr: "172.31.0.0/16",
+        vlan: 0,
+        status: "In use",
+        description: "AWS default VPC",
+        tags: "aws,default",
+        ip_range: formatIpRange("172.31.0.0/16"),
+        num_ips: countIps("172.31.0.0/16")
+      }
     ];
 
     // create Tabulator on DOM element with id "network-table"
     const table = new Tabulator("#network-table", {
       data: tableData,
       layout: "fitColumns",
-      reactiveData: true, // enable reactive data mutations
+      reactiveData: true,
       addRowPos: "top",
       height: "600px",
       columns: [
-        {
-          title: "Region/Site",
-          field: "region",
-          editor: "input",
-          headerFilter: "input"
-        },
-        {
-          title: "Location",
-          field: "location",
-          editor: "input",
-          headerFilter: "input"
-        },
-        {
-          title: "CIDR Range",
-          field: "cidr",
-          editor: "input",
-          headerFilter: "input",
-          validator: ["required", { type: "regex", regex: /^(?:\d{1,3}\.){3}\d{1,3}\/(?:[0-9]|[12][0-9]|3[0-2])$/ }]
-        },
-        {
-          title: "VLAN ID",
-          field: "vlan",
-          editor: "number",
-          headerFilter: "number"
-        },
-        {
-          title: "Status",
-          field: "status",
-          editor: "select",
-          editorParams: {
-            values: {
-              "In use": "In use",
-              "Deprecated": "Deprecated",
-              "Legacy": "Legacy",
-              "Decommissioned": "Decommissioned",
-              "Proposed": "Proposed",
-              "Future State": "Future State"
-            }
-          },
-          headerFilter: "select",
-          headerFilterParams: {
-            values: {
-              "": "(all)",
-              "In use": "In use",
-              "Deprecated": "Deprecated",
-              "Legacy": "Legacy",
-              "Decommissioned": "Decommissioned",
-              "Proposed": "Proposed",
-              "Future State": "Future State"
-            }
-          }
-        },
-        {
-          title: "Description",
-          field: "description",
-          editor: "textarea",
-          headerFilter: "input"
-        },
-        {
-          title: "Tags",
-          field: "tags",
-          formatter: "list",
-          formatterParams: { delimiter: "," },
-          editor: "input",
-          headerFilter: "input"
-        }
-      ],
-      cellEdited: (cell) => {
-        console.log("Cell Edited:", cell.getField(), cell.getValue());
+        { title: "Name", field: "name", editor: "input", headerFilter: "input" },
+        { title: "Region/Site", field: "region", editor: "input", headerFilter: "input" },
+        { title: "Location", field: "location", editor: "input", headerFilter: "input" },
+        { title: "CIDR Range", field: "cidr", editor: "input", headerFilter: "input", validator: ["required", { type: "regex", regex: /^(?:\d{1,3}\.){3}\d{1,3}\/(?:[0-9]|[12][0-9]|3[0-2])$/ }] },
+        { title: "VLAN ID", field: "vlan", editor: "number", headerFilter: "number" },
+        { title: "Status", field: "status", editor: "list", editorParams: { values: { "In use":"In use", "Deprecated":"Deprecated", "Legacy":"Legacy", "Decommissioned":"Decommissioned", "Proposed":"Proposed", "Future State":"Future State" } }, headerFilter: "select", headerFilterParams: { values: { "":"(all)", "In use":"In use", "Deprecated":"Deprecated", "Legacy":"Legacy", "Decommissioned":"Decommissioned", "Proposed":"Proposed", "Future State":"Future State" } } },
+        { title: "Description", field: "description", editor: "textarea", headerFilter: "input" },
+        { title: "Tags", field: "tags", formatter: "list", formatterParams: { delimiter: "," }, editor: "input", headerFilter: "input" },
+        { title: "IP Range", field: "ip_range", hozAlign: "center" },
+        { title: "# IPs", field: "num_ips", hozAlign: "center", sorter: "number" }
+      ]
+    });
+
+    // Update computed columns when CIDR is edited
+    table.on("cellEdited", (cell) => {
+      if (cell.getField() === "cidr") {
+        const newCidr = cell.getValue();
+        const row = cell.getRow();
+        row.update({
+          ip_range: formatIpRange(newCidr),
+          num_ips: countIps(newCidr)
+        });
       }
     });
 
     // button to add a blank row
     document.getElementById("add-network").addEventListener("click", () => {
-      table.addRow({ region: "", location: "", cidr: "", vlan: null, status: "Proposed", description: "", tags: "" });
+      table.addRow({ name: "", region: "", location: "", cidr: "", vlan: null, status: "Proposed", description: "", tags: "", ip_range: "", num_ips: "" });
     });
 
     // button to export data as JSON
