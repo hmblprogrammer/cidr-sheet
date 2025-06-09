@@ -6,6 +6,7 @@
   <title>Network Manager</title>
   <!-- Tabulator CSS -->
   <link href="https://unpkg.com/tabulator-tables@5.4.3/dist/css/tabulator.min.css" rel="stylesheet" />
+  <link href="style.css" rel="stylesheet" />
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     #controls { margin-bottom: 10px; }
@@ -64,28 +65,16 @@
       // Initial data
       const initialData = [
         {
-          name: "Office LAN",
-          region: "Building A",
-          location: "Floor 1",
-          cidr: "10.0.1.0/24",
-          vlan: 10,
-          status: "In use",
-          description: "Office network",
-          tags: "core,prod",
-          ip_range: formatIpRange("10.0.1.0/24"),
-          num_ips: countIps("10.0.1.0/24")
-        },
-        {
-          name: "AWS Default VPC",
-          region: "AWS us-east-1",
-          location: "us-east-1a",
-          cidr: "172.31.0.0/16",
-          vlan: 0,
-          status: "In use",
-          description: "AWS default VPC",
-          tags: "aws,default",
-          ip_range: formatIpRange("172.31.0.0/16"),
-          num_ips: countIps("172.31.0.0/16")
+          name: "",
+          region: "",
+          location: "",
+          cidr: "",
+          vlan: 1,
+          status: "",
+          description: "",
+          tags: "",
+          ip_range: "",
+          num_ips: ""
         }
       ];
 
