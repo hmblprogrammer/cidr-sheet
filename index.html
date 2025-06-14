@@ -160,7 +160,7 @@
         const reader = new FileReader();
         reader.onload = (ev) => {
           if (isCSV) {
-            table.setDataFromCSV(ev.target.result);
+            table.setData(ev.target.result, "csv");
           } else {
             try {
               const data = JSON.parse(ev.target.result);
