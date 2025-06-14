@@ -143,22 +143,24 @@
 
       document.getElementById("load-json").addEventListener("click", () => {
         document.getElementById("file-input").accept = ".json";
+        document.getElementById("file-input").dataset.format = "json";
         document.getElementById("file-input").click();
       });
 
       document.getElementById("load-csv").addEventListener("click", () => {
         document.getElementById("file-input").accept = ".csv";
+        document.getElementById("file-input").dataset.format = "csv";
         document.getElementById("file-input").click();
       });
 
       document.getElementById("file-input").addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const isCSV = file.name.endsWith(".csv");
+        const isCSV = e.target.dataset.format === "csv";
         const reader = new FileReader();
         reader.onload = (ev) => {
           if (isCSV) {
-            table.setData(ev.target.result);
+            table.setDataFromCSV(ev.target.result);
           } else {
             try {
               const data = JSON.parse(ev.target.result);
