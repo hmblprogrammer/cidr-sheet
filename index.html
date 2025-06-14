@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Network Manager</title>
+  <title>CIDR Sheet</title>
   <!-- Tabulator CSS -->
   <link href="https://unpkg.com/tabulator-tables@5.4.3/dist/css/tabulator.min.css" rel="stylesheet" />
   <link href="style.css" rel="stylesheet" />
@@ -14,7 +14,7 @@
   </style>
 </head>
 <body>
-  <h1>Network Manager</h1>
+  <h1>CIDR Sheet Network Manager</h1>
   <div id="controls">
     <button id="add-network">Add Network</button>
     <button id="download-json">Export JSON</button>
@@ -65,16 +65,16 @@
       // Initial data
       const initialData = [
         {
-          name: "",
-          region: "",
-          location: "",
-          cidr: "",
+          name: "Enter a name",
+          region: "Enter a region",
+          location: "Enter a location",
+          cidr: "10.0.0.0/8",
           vlan: 1,
-          status: "",
-          description: "",
-          tags: "",
-          ip_range: "",
-          num_ips: ""
+          status: "Proposed",
+          description: "Enter a description",
+          tags: "Enter tags",
+          ip_range: formatIpRange("10.0.0.0/8"),
+          num_ips: countIps("10.0.0.0/8")
         }
       ];
 
@@ -83,8 +83,8 @@
         data: initialData,
         layout: "fitColumns",
         reactiveData: true,
-        addRowPos: "top",
-        height: "600px",
+        addRowPos: "bottom",
+        virtualDom: false, // render every row, no virtualization
         columns: [
           { title: "Name", field: "name", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
           { title: "Region/Site", field: "region", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },

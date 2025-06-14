@@ -138,3 +138,64 @@ h1 {
     width: 100%;
   }
 }
+
+/* ————————————————————————————————
+   Filter‐field styling (inputs & selects in the header)
+   ———————————————————————————————— */
+.tabulator .tabulator-header-filter {
+  /* allow absolutely positioned pseudo‐elements if you want */
+  position: relative;
+}
+
+.tabulator .tabulator-header-filter input,
+.tabulator .tabulator-header-filter select {
+  /* light filter‐specific background */
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  /* make room for the icon */
+  padding: var(--space-xs) var(--space-sm) var(--space-xs) calc(var(--space-md) + 12px);
+  /* funnel icon via SVG data‐URI */
+  background-image: url("data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='%236b7a8f' d='M6 10.667V16L10 13.333v-2.666L16 4H0z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: var(--space-sm) center;
+  background-size: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.tabulator .tabulator-header-filter input:focus,
+.tabulator .tabulator-header-filter select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(47, 128, 237, 0.2);
+}
+
+.tabulator .tabulator-header-filter input,
+.tabulator .tabulator-header-filter select {
+  padding: var(--space-xs) var(--space-xs) var(--space-xs) calc(var(--space-lg) + var(--space-sm)) !important;
+}
+
+/* 1. Darker table “canvas” behind all rows */
+#network-table .tabulator-tableholder {
+  background-color: #e0e0e0; /* darker gray */
+}
+
+/* 2. Zebra-striping on every row */
+#network-table .tabulator-row:nth-child(odd) .tabulator-cell {
+  background-color: #ffffff !important; /* white */
+}
+#network-table .tabulator-row:nth-child(even) .tabulator-cell {
+  background-color: #f0f0f0 !important; /* light gray */
+}
+
+/* Override the inline height on the #network-table container */
+#network-table {
+  /* 120px here ≈ your <h1> + #controls + top/bottom margins; tweak as needed */
+  height: calc(100vh - 11em) !important;
+  margin-bottom: var(--space-md);
+}
+
+/* Make sure Tabulator’s scroll pane fills that new height */
+#network-table .tabulator-tableholder {
+  height: 100% !important;
+}
