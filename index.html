@@ -83,8 +83,8 @@
         data: initialData,
         layout: "fitColumns",
         reactiveData: true,
-        addRowPos: "top",
-        height: "600px",
+        addRowPos: "bottom",
+        virtualDom: false, // render every row, no virtualization
         columns: [
           { title: "Name", field: "name", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
           { title: "Region/Site", field: "region", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
