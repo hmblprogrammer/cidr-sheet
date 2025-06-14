@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CIDR Sheet</title>
-  <!-- Tabulator CSS -->
   <link href="https://unpkg.com/tabulator-tables@5.4.3/dist/css/tabulator.min.css" rel="stylesheet" />
   <link href="style.css" rel="stylesheet" />
   <style>
@@ -20,15 +19,14 @@
     <button id="download-json">Export JSON</button>
     <button id="load-json">Load JSON</button>
     <button id="show-columns">Show All Columns</button>
+    <button id="share-link">Copy Share Link</button>
   </div>
   <div id="network-table"></div>
   <input type="file" id="file-input" accept=".json" style="display:none" />
 
-  <!-- Tabulator JS -->
   <script src="https://unpkg.com/tabulator-tables@5.4.3/dist/js/tabulator.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // Helper functions for CIDR calculations
       function numToIp(num) {
         return [(num >>> 24) & 0xFF, (num >>> 16) & 0xFF, (num >>> 8) & 0xFF, num & 0xFF].join('.');
       }
@@ -62,7 +60,6 @@
         return Math.pow(2, 32 - mask);
       }
 
-      // Initial data
       const initialData = [
         {
           name: "Enter a name",
@@ -78,18 +75,29 @@
         }
       ];
 
-      // Create Tabulator instance
+      function decodeHashData() {
+        if (location.hash.startsWith("#data=")) {
+          try {
+            const json = decodeURIComponent(location.hash.slice(6));
+            return JSON.parse(atob(json));
+          } catch (e) {
+            console.warn("Failed to parse hash data");
+          }
+        }
+        return initialData;
+      }
+
       const table = new Tabulator("#network-table", {
-        data: initialData,
+        data: decodeHashData(),
         layout: "fitColumns",
         reactiveData: true,
         addRowPos: "bottom",
-        virtualDom: false, // render every row, no virtualization
+        virtualDom: false,
         columns: [
           { title: "Name", field: "name", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
           { title: "Region/Site", field: "region", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
           { title: "Location", field: "location", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "CIDR Range", field: "cidr", editor: "input", headerFilter: "input", validator: ["required", { type: "regex", regex: /^(?:\d{1,3}\.){3}\d{1,3}\/(?:[0-9]|[12][0-9]|3[0-2])$/ }], headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
+          { title: "CIDR Range", field: "cidr", editor: "input", headerFilter: "input", validator: ["required", { type: "regex", regex: /^(?:\d{1,3}\.){3}\d{1,3}\/([0-9]|[12][0-9]|3[0-2])$/ }], headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
           { title: "VLAN ID", field: "vlan", editor: "number", headerFilter: "number", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
           { title: "Status", field: "status", editor: "list", editorParams: { values: { "In use":"In use", "Deprecated":"Deprecated", "Legacy":"Legacy", "Decommissioned":"Decommissioned", "Proposed":"Proposed", "Future State":"Future State" } }, headerFilter: "select", headerFilterParams: { values: { "":"(all)", "In use":"In use", "Deprecated":"Deprecated", "Legacy":"Legacy", "Decommissioned":"Decommissioned", "Proposed":"Proposed", "Future State":"Future State" } }, headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
           { title: "Description", field: "description", editor: "textarea", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
@@ -100,7 +108,6 @@
         ]
       });
 
-      // Update computed columns on edit
       table.on("cellEdited", (cell) => {
         if (cell.getField() === "cidr") {
           const newCidr = cell.getValue();
@@ -111,7 +118,6 @@
         }
       });
 
-      // Control bindings
       document.getElementById("add-network").addEventListener("click", () => {
         table.addRow({ name: "", region: "", location: "", cidr: "", vlan: null, status: "Proposed", description: "", tags: "", ip_range: "", num_ips: "" });
       });
@@ -130,6 +136,7 @@
       });
 
       document.getElementById("load-json").addEventListener("click", () => document.getElementById("file-input").click());
+
       document.getElementById("file-input").addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -146,6 +153,13 @@
       });
 
       document.getElementById("show-columns").addEventListener("click", () => table.getColumns().forEach(col => col.show()));
+
+      document.getElementById("share-link").addEventListener("click", () => {
+        const data = table.getData();
+        const encoded = btoa(JSON.stringify(data));
+        const shareURL = `${location.origin}${location.pathname}#data=${encoded}`;
+        navigator.clipboard.writeText(shareURL).then(() => alert("Share link copied to clipboard!"));
+      });
     });
   </script>
 </body>
