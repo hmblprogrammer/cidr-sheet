@@ -18,11 +18,13 @@
     <button id="add-network">Add Network</button>
     <button id="download-json">Export JSON</button>
     <button id="load-json">Load JSON</button>
+    <button id="download-csv">Export CSV</button>
+    <button id="load-csv">Load CSV</button>
     <button id="show-columns">Show All Columns</button>
     <button id="share-link">Copy Share Link</button>
   </div>
   <div id="network-table"></div>
-  <input type="file" id="file-input" accept=".json" style="display:none" />
+  <input type="file" id="file-input" accept=".json,.csv" style="display:none" />
 
   <script src="https://unpkg.com/tabulator-tables@5.4.3/dist/js/tabulator.min.js"></script>
   <script>
@@ -78,7 +80,7 @@
       function decodeHashData() {
         if (location.hash.startsWith("#data=")) {
           try {
-            const json = decodeURIComponent(location.hash.slice(6));
+            const json = location.hash.slice(6);
             return JSON.parse(atob(json));
           } catch (e) {
             console.warn("Failed to parse hash data");
@@ -135,18 +137,35 @@
         URL.revokeObjectURL(url);
       });
 
-      document.getElementById("load-json").addEventListener("click", () => document.getElementById("file-input").click());
+      document.getElementById("download-csv").addEventListener("click", () => {
+        table.download("csv", "networks.csv");
+      });
+
+      document.getElementById("load-json").addEventListener("click", () => {
+        document.getElementById("file-input").accept = ".json";
+        document.getElementById("file-input").click();
+      });
+
+      document.getElementById("load-csv").addEventListener("click", () => {
+        document.getElementById("file-input").accept = ".csv";
+        document.getElementById("file-input").click();
+      });
 
       document.getElementById("file-input").addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        const isCSV = file.name.endsWith(".csv");
         const reader = new FileReader();
         reader.onload = (ev) => {
-          try {
-            const data = JSON.parse(ev.target.result);
-            table.replaceData(data);
-          } catch (err) {
-            alert("Invalid JSON file");
+          if (isCSV) {
+            table.setData(ev.target.result);
+          } else {
+            try {
+              const data = JSON.parse(ev.target.result);
+              table.replaceData(data);
+            } catch (err) {
+              alert("Invalid JSON file");
+            }
           }
         };
         reader.readAsText(file);
