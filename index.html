@@ -13,10 +13,24 @@
     .dropdown-content { display: none; position: absolute; background: #fff; min-width: 160px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); border-radius: 4px; z-index: 1; }
     .dropdown-content button { background: none; color: #333; padding: 8px 16px; text-align: left; width: 100%; border: none; cursor: pointer; }
     .dropdown-content button:hover { background: #f0f0f0; }
+    #intro { background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; }
+    .toggle-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; vertical-align: middle; margin-right: 8px; }
+    .toggle-btn:focus { outline: 2px solid #007BFF; }
+    #intro-header { display: flex; align-items: center; margin-bottom: 5px; }
+    #intro-header h2 { margin: 0; font-size: 1rem; font-weight: normal; color: #333; }
   </style>
 </head>
 <body>
   <h1>CIDR Sheet Network Manager</h1>
+  <div id="intro-header">
+    <button id="intro-toggle" class="toggle-btn" aria-label="Toggle introduction" title="Toggle introduction">&#9650;</button>
+    <h2>Introduction (click arrow to collapse)</h2>
+  </div>
+  <div id="intro">
+    <p>This tool helps you manage and document your network CIDR ranges. Enter network details, calculate IP ranges and counts automatically, and customize your view.</p>
+    <p>Use the controls below to add networks, import/export data, and configure columns. You can share your current view via the Export/Share menu.</p>
+    <p>Source code: <a href="https://github.com/hmblprogrammer/cidr-sheet" target="_blank">GitHub Repository</a></p>
+  </div>
   <div id="controls">
     <button id="add-network">Add Network</button>
     <button id="load-json">Load JSON</button>
@@ -54,11 +68,26 @@
       const defaultData = [{ name:"Enter a name", region:"Enter a region", location:"Enter a location", cidr:"10.0.0.0/8", vlan:1, status:"Proposed", description:"Enter a description", tags:"Enter tags", ip_range:formatIpRange("10.0.0.0/8"), num_ips:countIps("10.0.0.0/8") }];
       function decodeState() {
         if(location.hash.startsWith('#data=')){
-          try { return JSON.parse(atob(location.hash.slice(6))); } catch {} 
+          try { return JSON.parse(atob(location.hash.slice(6))); } catch {};
         }
-        return { data: defaultData, cols: null };
+        return { data: defaultData, cols: null, introVisible: true };
       }
       const state = decodeState();
+
+      // Manage intro visibility
+      const introDiv = document.getElementById('intro');
+      const introToggle = document.getElementById('intro-toggle');
+      function updateIntro() {
+        if(state.introVisible) {
+          introDiv.style.display = '';
+          introToggle.innerHTML = '&#9650;'; // up arrow
+        } else {
+          introDiv.style.display = 'none';
+          introToggle.innerHTML = '&#9660;'; // down arrow
+        }
+      }
+      introToggle.addEventListener('click', () => { state.introVisible = !state.introVisible; updateIntro(); });
+      updateIntro();
 
       // Initialize Tabulator
       const table = new Tabulator("#network-table", {
@@ -82,71 +111,41 @@
         ]
       });
 
-      // Restore column visibility & widths after build
+      // Restore columns
       table.on("tableBuilt", () => {
-        if(state.cols){
+        if(state.cols) {
           const allCols = table.getColumns(true);
           state.cols.forEach(colState => {
             const col = allCols.find(c => c.getField() === colState.field);
-            if(col){
-              colState.visible ? col.show() : col.hide();
-              if(colState.width) col.setWidth(colState.width);
-            }
+            if(col) { colState.visible ? col.show() : col.hide(); if(colState.width) col.setWidth(colState.width); }
           });
         }
       });
 
-      // Recompute on CIDR edits
+      // CIDR updates
       table.on("cellEdited", cell => {
-        if(cell.getField() === "cidr"){
+        if(cell.getField() === "cidr") {
           cell.getRow().update({ ip_range: formatIpRange(cell.getValue()), num_ips: countIps(cell.getValue()) });
         }
       });
 
-      // Control handlers
-      document.getElementById("add-network").addEventListener("click", () => {
-        table.addRow({ name:"", region:"", location:"", cidr:"", vlan:null, status:"Proposed", description:"", tags:"", ip_range:"", num_ips:"" });
-      });
+      // Controls
+      document.getElementById("add-network").addEventListener("click", () => table.addRow({ name:"", region:"", location:"", cidr:"", vlan:null, status:"Proposed", description:"", tags:"", ip_range:"", num_ips:"" }));
+      document.getElementById("load-json").addEventListener("click", () => { const input = document.getElementById("file-input"); input.accept = ".json"; input.click(); });
+      document.getElementById("file-input").addEventListener("change", e => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = ev => { try { table.replaceData(JSON.parse(ev.target.result)); } catch { alert("Invalid JSON file"); } }; reader.readAsText(file); });
 
-      document.getElementById("load-json").addEventListener("click", () => {
-        const input = document.getElementById("file-input"); input.accept = ".json"; input.click();
-      });
-
-      document.getElementById("file-input").addEventListener("change", e => {
-        const file = e.target.files[0]; if(!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => {
-          try { table.replaceData(JSON.parse(ev.target.result)); } catch { alert("Invalid JSON file"); }
-        };
-        reader.readAsText(file);
-      });
-
-      // Export/Share dropdown toggling
-      const expBtn = document.getElementById("export-share");
-      const menu = document.querySelector(".dropdown-content");
+      // Export/Share
+      const expBtn = document.getElementById("export-share"), menu = document.querySelector(".dropdown-content");
       expBtn.addEventListener("click", e => { e.stopPropagation(); menu.style.display = menu.style.display === 'block' ? 'none' : 'block'; });
       document.addEventListener("click", () => menu.style.display = 'none');
-
-      // Export JSON
-      document.getElementById("download-json").addEventListener("click", () => {
-        const blob = new Blob([JSON.stringify(table.getData(), null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a"); a.href = url; a.download = "networks.json";
-        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-      });
-
-      // Export CSV
+      document.getElementById("download-json").addEventListener("click", () => { const blob = new Blob([JSON.stringify(table.getData(), null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "networks.json"; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); });
       document.getElementById("download-csv").addEventListener("click", () => table.download("csv", "networks.csv"));
-
-      // Share link with state
       document.getElementById("share-link").addEventListener("click", () => {
         const cols = table.getColumns().map(col => ({ field: col.getField(), visible: col.isVisible(), width: col.getWidth() }));
-        const stateObj = { data: table.getData(), cols };
+        const stateObj = { data: table.getData(), cols, introVisible: state.introVisible };
         const url = `${location.origin}${location.pathname}#data=${btoa(JSON.stringify(stateObj))}`;
         navigator.clipboard.writeText(url).then(() => alert("Share link copied to clipboard!"));
       });
-
-      // Show all columns
       document.getElementById("show-columns").addEventListener("click", () => table.getColumns().forEach(col => col.show()));
     });
   </script>
