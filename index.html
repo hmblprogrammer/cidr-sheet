@@ -4,147 +4,135 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CIDR Sheet</title>
-  <!-- Tabulator CSS -->
   <link href="https://unpkg.com/tabulator-tables@5.4.3/dist/css/tabulator.min.css" rel="stylesheet" />
   <link href="style.css" rel="stylesheet" />
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    #controls { margin-bottom: 10px; }
-    #controls button { margin-right: 5px; }
-  </style>
 </head>
 <body>
   <h1>CIDR Sheet Network Manager</h1>
+  <div id="intro-header">
+    <button id="intro-toggle" class="toggle-btn" aria-label="Toggle introduction" title="Toggle introduction">&#9650;</button>
+    <h2>Introduction</h2>
+  </div>
+  <div id="intro">
+    <p>This tool helps you manage and document your network CIDR ranges. Enter network details, calculate IP ranges and counts automatically, and customize your view.</p>
+    <p>Use the controls below to add networks, import/export data, and configure columns. You can share your current view via the Export/Share menu.</p>
+    <p>Source code: <a href="https://github.com/hmblprogrammer/cidr-sheet" target="_blank">GitHub Repository</a></p>
+  </div>
   <div id="controls">
     <button id="add-network">Add Network</button>
-    <button id="download-json">Export JSON</button>
     <button id="load-json">Load JSON</button>
+    <div class="dropdown">
+      <button id="export-share">Export/Share ▼</button>
+      <div class="dropdown-content">
+        <button id="download-json">Export JSON</button>
+        <button id="download-csv">Export CSV</button>
+        <button id="share-link">Copy Share Link</button>
+      </div>
+    </div>
     <button id="show-columns">Show All Columns</button>
   </div>
   <div id="network-table"></div>
   <input type="file" id="file-input" accept=".json" style="display:none" />
 
-  <!-- Tabulator JS -->
   <script src="https://unpkg.com/tabulator-tables@5.4.3/dist/js/tabulator.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // Helper functions for CIDR calculations
-      function numToIp(num) {
-        return [(num >>> 24) & 0xFF, (num >>> 16) & 0xFF, (num >>> 8) & 0xFF, num & 0xFF].join('.');
-      }
-
+      // Helper functions
+      function numToIp(num) { return [(num >>> 24)&0xFF, (num>>>16)&0xFF, (num>>>8)&0xFF, num&0xFF].join('.'); }
       function parseCidr(cidr) {
-        const parts = cidr.split('/');
-        const ip = parts[0];
-        const mask = parseInt(parts[1], 10);
-        const ipParts = ip.split('.').map(x => parseInt(x, 10));
-        const ipNum = (((ipParts[0] << 24) >>> 0) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3]) >>> 0;
-        const hostBits = 32 - mask;
-        const maskBits = mask === 0 ? 0 : ((~0 << hostBits) >>> 0);
-        const network = (ipNum & maskBits) >>> 0;
-        const broadcast = (network | ((1 << hostBits) - 1)) >>> 0;
+        const [ip, maskStr] = cidr.split('/'); const mask = parseInt(maskStr,10);
+        const parts = ip.split('.').map(n=>parseInt(n,10));
+        const num = ((parts[0]<<24)>>>0) + (parts[1]<<16) + (parts[2]<<8) + parts[3];
+        const hostBits = 32-mask, maskBits = mask?((~0<<hostBits)>>>0):0;
+        const network = (num & maskBits)>>>0;
+        const broadcast = (network | ((1<<hostBits)-1))>>>0;
         return { first: numToIp(network), last: numToIp(broadcast) };
       }
+      function formatIpRange(cidr) { try { return cidr?`${parseCidr(cidr).first} - ${parseCidr(cidr).last}`:''; } catch{ return ''; } }
+      function countIps(cidr) { return cidr?Math.pow(2,32-parseInt(cidr.split('/')[1],10)):''; }
 
-      function formatIpRange(cidr) {
-        if (!cidr) return '';
-        try {
-          const { first, last } = parseCidr(cidr);
-          return `${first} - ${last}`;
-        } catch (e) {
-          return '';
+      // Decode initial state
+      const defaultData = [{ name:"Enter a name", region:"Enter a region", location:"Enter a location", cidr:"10.0.0.0/8", vlan:1, status:"Proposed", description:"Enter a description", tags:"Enter tags", ip_range:formatIpRange("10.0.0.0/8"), num_ips:countIps("10.0.0.0/8") }];
+      function decodeState() {
+        if(location.hash.startsWith('#data=')){
+          try { return JSON.parse(atob(location.hash.slice(6))); } catch {};
+        }
+        return { data: defaultData, cols: null, introVisible: true };
+      }
+      const state = decodeState();
+
+      // Manage intro visibility
+      const introDiv = document.getElementById('intro');
+      const introToggle = document.getElementById('intro-toggle');
+      function updateIntro() {
+        if(state.introVisible) {
+          introDiv.style.display = '';
+          introToggle.innerHTML = '&#9650;'; // up arrow
+        } else {
+          introDiv.style.display = 'none';
+          introToggle.innerHTML = '&#9660;'; // down arrow
         }
       }
+      introToggle.addEventListener('click', () => { state.introVisible = !state.introVisible; updateIntro(); });
+      updateIntro();
 
-      function countIps(cidr) {
-        if (!cidr) return '';
-        const mask = parseInt(cidr.split('/')[1], 10);
-        return Math.pow(2, 32 - mask);
-      }
-
-      // Initial data
-      const initialData = [
-        {
-          name: "Enter a name",
-          region: "Enter a region",
-          location: "Enter a location",
-          cidr: "10.0.0.0/8",
-          vlan: 1,
-          status: "Proposed",
-          description: "Enter a description",
-          tags: "Enter tags",
-          ip_range: formatIpRange("10.0.0.0/8"),
-          num_ips: countIps("10.0.0.0/8")
-        }
-      ];
-
-      // Create Tabulator instance
+      // Initialize Tabulator
       const table = new Tabulator("#network-table", {
-        data: initialData,
+        data: state.data,
         layout: "fitColumns",
         reactiveData: true,
         addRowPos: "bottom",
-        virtualDom: false, // render every row, no virtualization
+        virtualDom: false,
         columns: [
-          { title: "Name", field: "name", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "Region/Site", field: "region", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "Location", field: "location", editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "CIDR Range", field: "cidr", editor: "input", headerFilter: "input", validator: ["required", { type: "regex", regex: /^(?:\d{1,3}\.){3}\d{1,3}\/(?:[0-9]|[12][0-9]|3[0-2])$/ }], headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "VLAN ID", field: "vlan", editor: "number", headerFilter: "number", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "Status", field: "status", editor: "list", editorParams: { values: { "In use":"In use", "Deprecated":"Deprecated", "Legacy":"Legacy", "Decommissioned":"Decommissioned", "Proposed":"Proposed", "Future State":"Future State" } }, headerFilter: "select", headerFilterParams: { values: { "":"(all)", "In use":"In use", "Deprecated":"Deprecated", "Legacy":"Legacy", "Decommissioned":"Decommissioned", "Proposed":"Proposed", "Future State":"Future State" } }, headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "Description", field: "description", editor: "textarea", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "Tags", field: "tags", formatter: "list", formatterParams: { delimiter: "," }, editor: "input", headerFilter: "input", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "IP Range", field: "ip_range", hozAlign: "center", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "# IPs", field: "num_ips", hozAlign: "center", sorter: "number", headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }] },
-          { title: "Actions", field: "actions", formatter: "buttonCross", width: 50, hozAlign: "center", headerSort: false, headerMenu: [{ label: "Hide Column", action: (e, column) => column.hide() }], cellClick: (e, cell) => cell.getRow().delete() }
+          {title:"Name", field:"name", editor:"input", headerFilter:"input", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"Region/Site", field:"region", editor:"input", headerFilter:"input", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"Location", field:"location", editor:"input", headerFilter:"input", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"CIDR Range", field:"cidr", editor:"input", validator:["required",{type:"regex",regex:/^(?:\d{1,3}\.){3}\d{1,3}\/(?:[0-9]|[12][0-9]|3[0-2])$/}], headerFilter:"input", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"VLAN ID", field:"vlan", editor:"number", headerFilter:"number", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"Status", field:"status", editor:"list", editorParams:{values:{"In use":"In use","Deprecated":"Deprecated","Legacy":"Legacy","Decommissioned":"Decommissioned","Proposed":"Proposed","Future State":"Future State"}}, headerFilter:"select", headerFilterParams:{values:{"":"(all)","In use":"In use","Deprecated":"Deprecated","Legacy":"Legacy","Decommissioned":"Decommissioned","Proposed":"Proposed","Future State":"Future State"}}, headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"Description", field:"description", editor:"textarea", headerFilter:"input", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"Tags", field:"tags", formatter:"list", formatterParams:{delimiter:","}, editor:"input", headerFilter:"input", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"IP Range", field:"ip_range", hozAlign:"center", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"# IPs", field:"num_ips", hozAlign:"center", sorter:"number", headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}]},
+          {title:"Actions", field:"actions", formatter:"buttonCross", width:50, hozAlign:"center", headerSort:false, headerMenu:[{label:"Hide Column", action:(e,col)=>col.hide()}], cellClick:(e,cell)=>cell.getRow().delete()}
         ]
       });
 
-      // Update computed columns on edit
-      table.on("cellEdited", (cell) => {
-        if (cell.getField() === "cidr") {
-          const newCidr = cell.getValue();
-          cell.getRow().update({
-            ip_range: formatIpRange(newCidr),
-            num_ips: countIps(newCidr)
+      // Restore columns
+      table.on("tableBuilt", () => {
+        if(state.cols) {
+          const allCols = table.getColumns(true);
+          state.cols.forEach(colState => {
+            const col = allCols.find(c => c.getField() === colState.field);
+            if(col) { colState.visible ? col.show() : col.hide(); if(colState.width) col.setWidth(colState.width); }
           });
         }
       });
 
-      // Control bindings
-      document.getElementById("add-network").addEventListener("click", () => {
-        table.addRow({ name: "", region: "", location: "", cidr: "", vlan: null, status: "Proposed", description: "", tags: "", ip_range: "", num_ips: "" });
+      // CIDR updates
+      table.on("cellEdited", cell => {
+        if(cell.getField() === "cidr") {
+          cell.getRow().update({ ip_range: formatIpRange(cell.getValue()), num_ips: countIps(cell.getValue()) });
+        }
       });
 
-      document.getElementById("download-json").addEventListener("click", () => {
-        const data = table.getData();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "networks.json";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      });
+      // Controls
+      document.getElementById("add-network").addEventListener("click", () => table.addRow({ name:"", region:"", location:"", cidr:"", vlan:null, status:"Proposed", description:"", tags:"", ip_range:"", num_ips:"" }));
+      document.getElementById("load-json").addEventListener("click", () => { const input = document.getElementById("file-input"); input.accept = ".json"; input.click(); });
+      document.getElementById("file-input").addEventListener("change", e => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = ev => { try { table.replaceData(JSON.parse(ev.target.result)); } catch { alert("Invalid JSON file"); } }; reader.readAsText(file); });
 
-      document.getElementById("load-json").addEventListener("click", () => document.getElementById("file-input").click());
-      document.getElementById("file-input").addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          try {
-            const data = JSON.parse(ev.target.result);
-            table.replaceData(data);
-          } catch (err) {
-            alert("Invalid JSON file");
-          }
-        };
-        reader.readAsText(file);
+      // Export/Share
+      const expBtn = document.getElementById("export-share"), menu = document.querySelector(".dropdown-content");
+      expBtn.addEventListener("click", e => { e.stopPropagation(); menu.style.display = menu.style.display === 'block' ? 'none' : 'block'; });
+      document.addEventListener("click", () => menu.style.display = 'none');
+      document.getElementById("download-json").addEventListener("click", () => { const blob = new Blob([JSON.stringify(table.getData(), null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "networks.json"; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); });
+      document.getElementById("download-csv").addEventListener("click", () => table.download("csv", "networks.csv"));
+      document.getElementById("share-link").addEventListener("click", () => {
+        const cols = table.getColumns().map(col => ({ field: col.getField(), visible: col.isVisible(), width: col.getWidth() }));
+        const stateObj = { data: table.getData(), cols, introVisible: state.introVisible };
+        const url = `${location.origin}${location.pathname}#data=${btoa(JSON.stringify(stateObj))}`;
+        navigator.clipboard.writeText(url).then(() => alert("Share link copied to clipboard!"));
       });
-
       document.getElementById("show-columns").addEventListener("click", () => table.getColumns().forEach(col => col.show()));
     });
   </script>
