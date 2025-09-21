@@ -139,10 +139,6 @@
         reader.onload = ev => {
           try {
             let data = JSON.parse(ev.target.result);
-            if(Array.isArray(data)) {
-              // migrate any rows missing dns_domain
-              data = data.map(r => ({ dns_domain:"", ...r }));
-            }
             table.replaceData(data);
           } catch { alert("Invalid JSON file"); }
         };
