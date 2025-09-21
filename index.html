@@ -26,6 +26,7 @@
       <div class="dropdown-content">
         <button id="download-json">Export JSON</button>
         <button id="download-csv">Export CSV</button>
+        <button id="download-md">Export Markdown</button>
         <button id="share-link">Copy Share Link</button>
       </div>
     </div>
@@ -50,6 +51,16 @@
       }
       function formatIpRange(cidr) { try { return cidr?`${parseCidr(cidr).first} - ${parseCidr(cidr).last}`:''; } catch{ return ''; } }
       function countIps(cidr) { return cidr?Math.pow(2,32-parseInt(cidr.split('/')[1],10)):''; }
+
+      // Markdown export helper
+      function exportToMarkdown(data) {
+        if (!data || data.length === 0) return '';
+        const headers = Object.keys(data[0]);
+        const headerRow = `| ${headers.join(' | ')} |`;
+        const separatorRow = `| ${headers.map(()=> '---').join(' | ')} |`;
+        const rows = data.map(row => `| ${headers.map(h => (row[h]!==undefined? String(row[h]).replace(/\n/g,' ') : '')).join(' | ')} |`);
+        return ['# CIDR Sheet Export', '', headerRow, separatorRow, ...rows].join('\n');
+      }
 
       // Decode initial state
       const defaultCIDR="10.0.0.0/8";
@@ -161,6 +172,18 @@
         URL.revokeObjectURL(url);
       });
       document.getElementById("download-csv").addEventListener("click", () => table.download("csv", "networks.csv"));
+      document.getElementById("download-md").addEventListener("click", () => {
+        const markdown = exportToMarkdown(table.getData());
+        const blob = new Blob([markdown], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "networks.md";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
       document.getElementById("share-link").addEventListener("click", () => {
         const cols = table.getColumns().map(col => ({ field: col.getField(), visible: col.isVisible(), width: col.getWidth() }));
         const stateObj = { data: table.getData(), cols, introVisible: state.introVisible };
